@@ -184,6 +184,7 @@ def get_args():
 
 # ----------------- util -----------------
 def write_row(row, path):
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     header = not os.path.isfile(path)
     pd.DataFrame([row]).to_csv(path, mode="a", header=header, index=False)
 
@@ -322,7 +323,7 @@ def main():
             pkl.dump(pred, f)
 
         # delete all local variables and collect garbage
-        del pred, trainer, location_model, celltype_model, inf
+        del pred, inf
         torch.cuda.empty_cache()
         gc.collect()
 
