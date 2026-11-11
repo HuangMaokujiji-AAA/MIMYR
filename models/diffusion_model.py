@@ -359,11 +359,15 @@ class DDPMTrainer:
         ).to(self.device)
 
         self.ema = EMA(self.model, decay=cfg.ema_decay)
-        self.opt = optim.AdamW(
-            self.model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay
-        )
+        # Inference only needs model/EMA weights. Optimizer construction can import
+        # optional training integrations, so defer it until training is requested.
+        self.opt = None
 
     def train(self):
+        if self.opt is None:
+            self.opt = optim.AdamW(
+                self.model.parameters(), lr=self.cfg.lr, weight_decay=self.cfg.weight_decay
+            )
         self.model.train()
         for epoch in range(1, self.cfg.epochs + 1):
             total_loss, n_batches = 0, 0

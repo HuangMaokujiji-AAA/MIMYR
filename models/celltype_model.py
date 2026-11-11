@@ -468,13 +468,16 @@ class SkeletonCelltypeModel2(nn.Module):
         ).to(self.device)
 
         self.loss_fn = nn.CrossEntropyLoss()
-        self.optimizer = optim.Adam(self.model.parameters(), lr=learning_rate)
+        self.learning_rate = learning_rate
+        self.optimizer = None  # A frozen prediction run does not need an optimizer.
         self.best_model = None
 
     def forward(self, x):
         return self.model(x)
 
     def fit(self, train_adata, val_adata=None, batch_size=32, epochs=10):
+        if self.optimizer is None:
+            self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
         X_train = torch.tensor(
             train_adata.obsm["aligned_spatial"], dtype=torch.float32
         ).to(self.device)
