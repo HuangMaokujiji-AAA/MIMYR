@@ -1,0 +1,802 @@
+
+=== PDF PAGE 1 ===
+MIMYR : Generative modeling of missing tissue in spatial
+transcriptomics
+Ajinkya Deshpande1, Zhilei Bei 2, Jian Ma 3,*, and Spencer Krieger 3,*
+1Machine Learning Department,
+School of Computer Science, Carnegie Mellon University , Pittsburgh, P A, USA
+2Department of Electrical Engineering and Computer Science,
+Massachusetts Institute of T echnology , Cambridge, MA, USA
+3Ray and Stephanie Lane Computational Biology Department,
+School of Computer Science, Carnegie Mellon University , Pittsburgh, P A, USA
+*Correspondence: jianma@cs.cmu.edu (J.M.) and skrieger@andrew.cmu.edu (S.K.)
+Abstract
+Spatial transcriptomics enables the study of how gene expression is organized across tissues, reveal-
+ing how cells interact within their native microenvironments in health and disease. However, tissue
+damage during sectioning and the allocation of intermediate slices to other assays often result in
+regions or entire planes missing from the data, limiting downstream analysis. Here, we introduce
+MIMYR , a generative framework for reconstructing realistic spatial transcriptomics data in unmea-
+sured tissue regions. M IMYR addresses this challenge through three coupled components: predicting
+cell locations via guided diffusion, assigning cell types through supervised classiﬁcation, and gener-
+ating gene expression proﬁles with a transformer conditioned on spatial and cellular context. M IMYR
+accurately reconstructs held-out regions in mouse brain data and generalizes across experimental
+conditions, including variations in gene panels and slicing orientations. After ﬁnetuning on limited
+Alzheimer’s disease data, MIMYR captures disease-associated transcriptional changes in unmeasured
+brain regions. By enabling high-ﬁdelity spatial imputation from limited training data, M IMYR ex-
+tends the utility of spatial transcriptomics, allowing researchers to recover unmeasured tissue states
+and deepen investigations into tissue spatial organization and dynamics.
+1
+.CC-BY-NC-ND 4.0 International licenseavailable under a
+(which was not certified by peer review) is the author/funder, who has granted bioRxiv a license to display the preprint in perpetuity. It is made 
+The copyright holder for this preprintthis version posted November 27, 2025. ; https://doi.org/10.1101/2025.11.24.690239doi: bioRxiv preprint 
+.CC-BY-NC-ND 4.0 International licenseavailable under a
+(which was not certified by peer review) is the author/funder, who has granted bioRxiv a license to display the preprint in perpetuity. It is made 
+The copyright holder for this preprintthis version posted November 27, 2025. ; https://doi.org/10.1101/2025.11.24.690239doi: bioRxiv preprint 
+.CC-BY-NC-ND 4.0 International licenseavailable under a
+(which was not certified by peer review) is the author/funder, who has granted bioRxiv a license to display the preprint in perpetuity. It is made 
+The copyright holder for this preprintthis version posted November 27, 2025. ; https://doi.org/10.1101/2025.11.24.690239doi: bioRxiv preprint 
+.CC-BY-NC-ND 4.0 International licenseavailable under a
+(which was not certified by peer review) is the author/funder, who has granted bioRxiv a license to display the preprint in perpetuity. It is made 
+The copyright holder for this preprintthis version posted November 27, 2025. ; https://doi.org/10.1101/2025.11.24.690239doi: bioRxiv preprint 
+.CC-BY-NC-ND 4.0 International licenseavailable under a
+(which was not certified by peer review) is the author/funder, who has granted bioRxiv a license to display the preprint in perpetuity. It is made 
+The copyright holder for this preprintthis version posted November 27, 2025. ; https://doi.org/10.1101/2025.11.24.690239doi: bioRxiv preprint 
+.CC-BY-NC-ND 4.0 International licenseavailable under a
+(which was not certified by peer review) is the author/funder, who has granted bioRxiv a license to display the preprint in perpetuity. It is made 
+The copyright holder for this preprintthis version posted November 27, 2025. ; https://doi.org/10.1101/2025.11.24.690239doi: bioRxiv preprint 
+.CC-BY-NC-ND 4.0 International licenseavailable under a
+(which was not certified by peer review) is the author/funder, who has granted bioRxiv a license to display the preprint in perpetuity. It is made 
+The copyright holder for this preprintthis version posted November 27, 2025. ; https://doi.org/10.1101/2025.11.24.690239doi: bioRxiv preprint 
+.CC-BY-NC-ND 4.0 International licenseavailable under a
+(which was not certified by peer review) is the author/funder, who has granted bioRxiv a license to display the preprint in perpetuity. It is made 
+The copyright holder for this preprintthis version posted November 27, 2025. ; https://doi.org/10.1101/2025.11.24.690239doi: bioRxiv preprint 
+.CC-BY-NC-ND 4.0 International licenseavailable under a
+(which was not certified by peer review) is the author/funder, who has granted bioRxiv a license to display the preprint in perpetuity. It is made 
+The copyright holder for this preprintthis version posted November 27, 2025. ; https://doi.org/10.1101/2025.11.24.690239doi: bioRxiv preprint 
+.CC-BY-NC-ND 4.0 International licenseavailable under a
+(which was not certified by peer review) is the author/funder, who has granted bioRxiv a license to display the preprint in perpetuity. It is made 
+The copyright holder for this preprintthis version posted November 27, 2025. ; https://doi.org/10.1101/2025.11.24.690239doi: bioRxiv preprint 
+.CC-BY-NC-ND 4.0 International licenseavailable under a
+(which was not certified by peer review) is the author/funder, who has granted bioRxiv a license to display the preprint in perpetuity. It is made 
+The copyright holder for this preprintthis version posted November 27, 2025. ; https://doi.org/10.1101/2025.11.24.690239doi: bioRxiv preprint 
+.CC-BY-NC-ND 4.0 International licenseavailable under a
+(which was not certified by peer review) is the author/funder, who has granted bioRxiv a license to display the preprint in perpetuity. It is made 
+The copyright holder for this preprintthis version posted November 27, 2025. ; https://doi.org/10.1101/2025.11.24.690239doi: bioRxiv preprint 
+.CC-BY-NC-ND 4.0 International licenseavailable under a
+(which was not certified by peer review) is the author/funder, who has granted bioRxiv a license to display the preprint in perpetuity. It is made 
+The copyright holder for this preprintthis version posted November 27, 2025. ; https://doi.org/10.1101/2025.11.24.690239doi: bioRxiv preprint 
+
+=== PDF PAGE 2 ===
+Introduction
+Spatial transcriptomics (ST) enables direct measurement of gene expression within intact tissue archi-
+tecture, making it possible to investigate how cells organize, communicate, and adapt in their native
+environments [1–4]. Spatial structure is tightly linked to biological function [5], and understanding these
+patterns requires continuous spatial context rather than isolated snapshots [6, 7]. Despite advances in
+spatial transcriptomics, physical sectioning remains a major source of technical artifacts [8]. Slicing can
+introduce tears, folds, and geometric distortions, and in some cases entire regions of tissue are lost. In
+a MERFISH mouse brain atlas [9], for example, many slices exhibit sizeable missing patches (Fig. S1).
+These gaps limit downstream analyses and compromise computational methods that rely on intact tissue
+sections. In many workﬂows, intermediate sections are allocated to complementary assays (e.g., histol-
+ogy, single-cell sequencing), creating missing planes that interrupt spatial continuity [10]. These gaps
+obscure depth-dependent transitions, blur anatomical boundaries, and impede reconstruction of cellular
+neighborhoods. Consequently, spatial transcriptomics datasets often capture an incomplete view of tis-
+sue architecture. Because the detection of spatial features – rare cell types, layer-speciﬁc structures, and
+enriched cell–cell adjacencies – relies on contiguous sampling [11], removing sections sharply lowers
+the probability of recovering these patterns, especially in structured organs. Missing planes therefore do
+more than reduce data volume: they eliminate spatial signals that are central to biological interpretation
+and weaken downstream analyses.
+Reconstructing missing tissue sections is therefore essential for enabling comprehensive spatial anal-
+ysis. Recent methods have begun to address incomplete or under-sampled spatial transcriptomics data,
+but each tackles only part of the reconstruction problem. LUNA [12] learns atlas-derived spatial priors
+to reassemble dissociated cells into tissue structures, yet it cannot generate new cell types or transcrip-
+tomes for unmeasured regions. stDiff [13] denoises or imputes low-quality expression by transferring
+abundance patterns from scRNA-seq, improving observed spots but not ﬁlling missing tissue. Other
+approaches aim to enhance or interpolate existing measurements without generating new cellular lay-
+outs: GNTD [14] densiﬁes sparse sequencing-based ST data via graph-guided tensor decomposition
+but operates only on existing spots; C2-STi [15] interpolates intermediate histology sections using spa-
+tial transcriptomics as auxiliary input rather than reconstructing new cells or full transcriptomes; and
+SpatialZ [16] seeks 3D reconstruction from planar ST slices but assigns gene expression using a lookup-
+based procedure rather than a generative model. Among generative approaches, STDIFFUSION [17]
+extends diffusion models to spatial transcriptomics but relies on blending heuristics for in-between slices
+and cannot robustly handle missing planes or interior gaps. Collectively, existing methods do not provide
+a continuous generative model capable of reconstructing truly missing tissue regions under heteroge-
+neous panels, modalities, and conditions.
+Here, we introduce M
+IMYR , a generative framework that tackles the full spatial-transcriptomic re-
+construction problem by explicitly modeling the three components required to rebuild missing tissue:
+cell locations, cell identities, and complete gene-expression proﬁles. M IMYR comprises three coordi-
+nated modules: (1) a plane-conditioned, backward-guided diffusion model that synthesizes realistic spa-
+tial layouts and reconstructs entire intermediate slices; (2) a supervised classiﬁer that assigns cell types
+consistent with tissue architecture; and (3) a transformer-based generator that produces spatially coher-
+ent transcriptomes conditioned on the inferred geometry and identities. Across spatial and functional
+metrics, M
+IMYR reconstructs realistic spatial transcriptomics data, generalizes to sparse settings and
+heterogeneous gene panels, and handles alternative slicing orientations such as sagittal brain sections.
+2
+.CC-BY-NC-ND 4.0 International licenseavailable under a
+(which was not certified by peer review) is the author/funder, who has granted bioRxiv a license to display the preprint in perpetuity. It is made 
+The copyright holder for this preprintthis version posted November 27, 2025. ; https://doi.org/10.1101/2025.11.24.690239doi: bioRxiv preprint 
+
+=== PDF PAGE 3 ===
+x
+yz
+measured sliceunmeasured slice
+Cell Location 𝑺={𝒔𝒊} Cell Type 𝑪={𝒄𝒊}Gene Expression 𝑿={𝒙𝒊}
+MIMYR Generative Framework predicted slice
+𝑷(𝒔𝒊) 𝑷(𝒄𝒊|𝒔𝒊) 𝑷(𝒙𝒊|𝒔𝒊,𝒄𝒊,𝒙𝒋<𝒊)z0
+z1
+z2
+Kernel Density Estimation
+slice position z1
+neighbor slices
+Guidance
+predicted cell density distribution
+Reverse Diffusion
+Reverse Diffusion
+Reverse Diffusion
+predicted cell location (x, y, z1)
+predicted cell type distribution
+𝑀𝑆 𝑆𝑖
+𝑀𝐶 𝐶𝑖
+𝑀𝐷 𝐷𝑖
+𝑀𝑂 𝑂𝑖
+𝑀𝑌 𝑌𝑖
+𝑀𝑇 𝑇𝑖
+𝐺1 𝐸1
+𝐺2 𝐸2…𝐺𝑖−1𝐸𝑖−1
+contexttype | value
+G1 G2 Gi-1
+Gene Regulatory Network…geneorder
+TransformerGene ID
+Binned Expression
+Real-valued Expression
+𝐺𝑖 𝐸𝑖
+auto-regressive decoding
+Figure 1: Overview of the M IMYR generative framework. The M IMYR framework reconstructs unmeasured
+spatial transcriptomic regions through a multi-stage generative pipeline. (1) Guided by cell density distributions
+from neighboring slices, a diffusion model predicts plausible cell locations on the target plane S = {si}. (2)
+Based on these predicted coordinates, an MLP estimates cell-type probabilities P (ci | si), from which cell iden-
+tities are sampled. (3) Conditioned on the predicted cell location MS and cell type MC , as well as metadata
+variables MD ,M O ,M Y ,M T representing species, organ, disease state, and technology , a transformer autore-
+gressively generates gene identiﬁers G and corresponding expression values E according to an order derived
+from a gene regulatory network. T ogether, these modules produce spatially coherent and biologically consistent
+gene-expression reconstructions across the tissue.
+MIMYR can also extend transcriptomes to all genes available from pretraining data and generate wild-
+type control slices for disease tissues while preserving biologically interpretable differences. Together,
+these capabilities close a key methodological gap, enabling cross-condition, cross-panel, and cross-slice
+analyses in datasets with missing tissue, limited samples, or disease-speciﬁc perturbations.
+Results
+MIMYR overview
+MIMYR frames spatial transcriptomics reconstruction as three linked generative tasks: predicting cellular
+locations, assigning cell identities, and inferring full gene-expression proﬁles (Fig. 1).
+1. A plane-conditioned diffusion model learns tissue-level cell density and uses kernel density esti-
+mator (KDE)-guided reverse diffusion to generate cell coordinates for missing regions.
+2. A multi-layer perceptron (MLP) assigns cell identities by mapping spatial coordinates to cluster
+labels learned from annotated slices.
+3. A transformer generates full gene expression proﬁles conditioned on spatial position, inferred cell
+state, and optional metadata such as species, disease state, gene panel, or technology.
+The ﬁnal output is a complete spatially resolved transcriptome for every generated cell in the recon-
+3
+.CC-BY-NC-ND 4.0 International licenseavailable under a
+(which was not certified by peer review) is the author/funder, who has granted bioRxiv a license to display the preprint in perpetuity. It is made 
+The copyright holder for this preprintthis version posted November 27, 2025. ; https://doi.org/10.1101/2025.11.24.690239doi: bioRxiv preprint 
+
+=== PDF PAGE 4 ===
+structed region.
+MIMYR introduces several technical innovations that advance spatial-omics reconstruction. First,
+whereas existing approaches struggle to generalize to unseen intermediate slices and rely on simple inter-
+polation schemes such as slice blending, M IMYR learns an explicit plane-conditioned generative model
+that predicts a continuous family of intermediate sections and generates an arbitrary number of cells
+based on the target slice thickness. Second, the diffusion component incorporates backward-guidance,
+leveraging information from neighboring slices when available, producing structurally consistent re-
+constructions without paired supervision. Third, the expression module introduces a new, biologically
+informed tokenization strategy that orders gene tokens using a gene regulatory network, imposing bio-
+logically meaningful structure on the generation process. Finally, the expression module conditions on
+metadata such as disease state, enabling synthesis of gene-expression proﬁles under varying biological
+conditions rather than producing a single, undifferentiated distribution.
+We evaluated M
+IMYR across diverse large-scale spatial transcriptomics datasets – including a whole-
+brain MERSCOPE atlas [18] and a companion MERFISH atlas [9], as well as an Alzheimer’s disease
+MERFISH dataset [19] – to assess reconstruction performance across samples, gene panels, slicing ori-
+entations, and disease contexts using standardized train/validation/test splits. Across all settings, we
+compared M
+IMYR to a rule-based baseline that mirrors its three-stage pipeline: assigning locations from
+spatially nearest reference slices (or uniformly in zero-shot scenarios), inferring cell types via local
+majority voting among nearby reference cells, and copying gene expression proﬁles from the closest ref-
+erence cell of the predicted type, providing a simple and interpretable benchmark for quantifying model
+improvements.
+Reconstruction of missing tissue regions in an atlas-scale mouse brain dataset
+Missing tissue regions in spatial transcriptomics, caused by tearing, deformation, or incomplete mea-
+surements, create local gaps that obscure biological structure and complicate downstream analyses. To
+evaluate how well M IMYR reconstructs such missing areas in an atlas-style setting, where many tissue
+slices are available for training, we withheld individual slices from a MERSCOPE mouse brain atlas [18]
+and trained the model on the remaining sections. Each withheld slice served as a large, biologically re-
+alistic missing region, enabling direct assessment of reconstruction ﬁdelity under matched morphology
+and gene panels.
+Visual inspection of predicted cell types shows that M IMYR accurately restores tissue organization
+and major anatomical boundaries (Fig. 2A). Laminar structures and regional divisions are preserved,
+although thin layers and sharp transitions appear slightly smoothed, and a small number of ﬁne-scale
+domains are mislabeled. Predicted expression for genes such as Tmem215, Grik3, and Arhgap25 recovers
+both dominant spatial gradients and local expression hotspots, indicating that the model captures large-
+scale architecture as well as ﬁne-grained transcriptional structure (Fig. 2D–E).
+We next compared reconstruction accuracy against a rule-based baseline that infers cell positions
+from adjacent slices, assigns cell types via local majority voting, and copies gene expression from nearby
+cells of the same predicted cell type. We evaluated reconstruction quality using two neighborhood-aware
+metrics – soft Spearman correlation and soft F1 – which together quantify how well local gene-expression
+patterns and spatial activity hotspots are preserved (full descriptions in Methods). Across neighborhood
+radii r →{ 0.03, 0.04, 0.05} – corresponding approximately to 8, 14 and 20 cells per neighborhood –
+baseline soft Spearman correlations were 0.39, 0.44, and 0.48, whereas M
+IMYR achieved 0.45, 0.53,
+4
+.CC-BY-NC-ND 4.0 International licenseavailable under a
+(which was not certified by peer review) is the author/funder, who has granted bioRxiv a license to display the preprint in perpetuity. It is made 
+The copyright holder for this preprintthis version posted November 27, 2025. ; https://doi.org/10.1101/2025.11.24.690239doi: bioRxiv preprint 
+
+=== PDF PAGE 5 ===
+A B
+ED
+ 0
+1
+Ground TruthMIMYR
+Tmem215Grik3Arhgap25Tmem215Grik3Arhgap25Ground TruthMIMYR
+0.00.20.40.60.81.0MIMYR F10.00.20.40.60.81.0Lookup F10.030.040.05Radius0.30.40.50.6Soft SpearmanCorrelationLookupMIMYR
+C
+Normalized geneexpression
+Low
+High
+Figure 2: Performance evaluation using a multi-sample atlas. A. Spatial maps of test slice 1 comparing
+ground truth cell types (left) to M IMYR ’s predictions (right). B. Soft Spearman correlation at neighborhood radii
+r →{ 0.03, 0.04, 0.05} comparing M IMYR to a lookup baseline. C. KDE plot of F1 scores per spot across test
+slice 1, comparing M IMYR (x-axis) to the lookup baseline (y-axis), where points below the y=x reference line
+indicate superior performance by M IMYR . D. Spatial expression for three example genes ( Tmem215, Grik3,
+Arhgap25) on test slice 1 comparing ground truth (top) and M IMYR ’s prediction (bottom). E. Spatial expression
+for three example genes (Tmem215, Grik3, Arhgap25) on test slice 3 comparing ground truth (top) and M IMYR ’s
+prediction (bottom).
+and 0.58 (absolute gains of +0.06, +0.08, and +0.10) ( Fig. 2B). The performance gap widened at larger
+radii, reﬂecting the model’s ability to recover coherent gene-expression organization even when small
+spatial misalignments are present. Although larger radii naturally tolerate positional offsets and therefore
+raise overall correlations, the increasing margin emphasizes that M IMYR reconstructs local expression
+structure more faithfully than the baseline, rather than merely reproducing global intensity patterns.
+Improvements were consistent across slices, indicating that gains are robust rather than driven by isolated
+examples.
+To evaluate gene-level accuracy beyond correlation-based metrics, we binarized ground-truth and
+predicted expression and computed a per-spot soft F1 score. Across slices, the rule-based baseline
+reached an average soft F1 of 0.65, whereas M IMYR achieved 0.70 (absolute improvement +0.05; 9%
+relative gain). A two-dimensional kernel density estimate of per-spot F1 for slice 1 showed the highest-
+density region concentrated below the y=x diagonal, indicating systematically higher F1 values for
+MIMYR (Fig. 2C). Similar distributions were observed for other slices, with modest shifts in peak den-
+sity across samples. Together, these analyses demonstrate that M IMYR captures biologically meaningful
+spatial gene expression patterns with greater ﬁdelity than the rule-based approach.
+With abundant training data from the same dataset, M IMYR generalizes effectively to held-out slices,
+outperforming the baseline across spatial radii. The model preserves large-scale anatomical organization
+and reproduces ﬁne-grained expression trends, with remaining discrepancies largely conﬁned to bound-
+ary sharpness and minor dynamic-range compression at the smallest spatial scales. Collectively, these
+results show that M IMYR can reliably reconstruct missing regions in spatial transcriptomics datasets,
+5
+
+=== PDF PAGE 6 ===
+0.120.15Radius0.450.500.550.600.65Soft Spearman CorrelationlookupMIMYR Zero-shotMIMYR Finetuned
+D
+E
+ F
+BC
+A
+ Ground TruthMIMYR
+Tmem215CrymArhgap25Ground TruthMIMYR
+Tmem215Six3Rspo2
+0.030.040.05Radius0.20.30.4Soft SpearmanCorrelationlookupMIMYR0.00.20.40.60.81.0MIMYR Finetuned F10.00.20.40.60.81.0MIMYR Zero-shot F1
+Low
+High
+0
+1
+Normalized geneexpressionFigure 3: Cross-setting performance and qualitative comparisons. A. Soft Spearman correlation at radii
+r →{ 0.12, 0.15} for M IMYR Zero-shot, M IMYR Finetuned, and the lookup baseline in the cross-gene-panel
+setting. B. KDE plot of F1 scores per spot for test slice 1, comparing M IMYR Finetuned (x-axis) to M IMYR Zero-
+shot (y-axis), where points below the y=x reference line indicate superior performance by M IMYR Finetuned.
+C. Spatial maps for a sagittal test slice comparing ground truth cell types (top) to M IMYR ’s predictions (bottom).
+D. Soft Spearman correlation at radii r →{ 0.03, 0.04, 0.05} for M IMYR Finetuned and the lookup baseline over
+sagittal test slices. E. Spatial expression for three example genes ( Tmem215, Arhgap25, Crym) on sagittal test
+slice 1, comparing ground truth (top) and M IMYR ’s prediction (bottom). F. Spatial expression for three example
+genes ( Tmem215, Rspo2, Six3) on sagittal test slice 3, comparing ground truth (top) and M IMYR ’s prediction
+(bottom).
+enabling more complete and biologically accurate analyses of partially observed tissues.
+Transfer learning enables robust reconstruction in sparse data regimes
+In many practical settings, only a few tissue slices are available, creating a sparse data regime that chal-
+lenges model generalization. While earlier experiments assumed abundant training data from the same
+atlas dataset, we next examined how M IMYR performs when only limited measurements are available.
+To do so, we adopted a transfer-learning framework in which a model trained on one dataset is evaluated
+on a related target dataset. We considered two regimes. In the zero-shot setting, the model is applied
+directly to the target dataset without ﬁne-tuning, requiring complete generalization from the source do-
+main. In the few-shot setting , a small set of target slices is provided for ﬁne-tuning, and performance
+is re-evaluated on held-out slices to quantify how much limited in-domain supervision improves recon-
+struction. The target dataset uses a different gene panel, adding variability akin to real experimental
+conditions [20].
+For zero-shot evaluation, we applied M IMYR , trained exclusively on the coronal slices of the MER-
+SCOPE brain atlas [ 18], directly to an independent MERFISH atlas [ 9] with no adaptation ( Fig. 3A).
+Across slices, M IMYR achieved mean soft-Spearman correlations of 0.56 and 0.59 at radii 0.12 and 0.15,
+outperforming the lookup baseline (0.48, 0.52) by +0.08 and +0.07.
+In the few-shot setting, the model was ﬁne-tuned on a small subset of target-domain slices, and the
+6
+
+=== PDF PAGE 7 ===
+lookup baseline used the same slices for neighborhood voting and gene-expression transfer. Fine-tuning
+increased performance to 0.57 and 0.62 at the same radii, corresponding to improvements over lookup
+of +0.09 and +0.1. The distribution of per-spot soft F1 scores showed the highest-density region below
+the y=x diagonal, indicating consistent beneﬁts from ﬁne-tuning ( Fig. 3B). Even limited supervision
+allowed the model to adjust to measurement- and panel-speciﬁc batch effects, improving expression
+prediction for both in-panel and out-of-panel genes. Remaining errors were largely localized to low-
+coverage regions and rare cell types.
+To assess orientation transfer, we next evaluated M IMYR on sagittal slices from the MERFISH at-
+las [ 9], introducing both geometric and molecular domain shifts. After ﬁne-tuning on a small number
+of sagittal slices, M IMYR continued to outperform the lookup baseline ( Fig. 3D), achieving mean soft
+Spearman gains of +0.04, +0.05, and +0.06 at radii 0.03, 0.04, and 0.05. Qualitative agreement is vis-
+ible in the cell-type maps ( Fig. 3C), and representative gene-expression reconstructions for sagittal test
+slices 1 and 3 show preservation of large-scale anatomical organization and major expression gradi-
+ents, with remaining discrepancies primarily conﬁned to thin boundaries and other ﬁne spatial features
+(Fig. 3E-F).
+Overall, MIMYR demonstrates strong cross-dataset generalization and efﬁcient adaptation under lim-
+ited supervision. Zero-shot transfer already surpasses a strong rule-based baseline on a new dataset, and
+light ﬁne-tuning closes most of the remaining gap to in-domain performance. The model’s gains are
+largest at broader spatial radii, indicating robust recovery of global structure under strong domain shifts.
+Reconstructing disease-associated spatial transcriptomes
+We next evaluated whether MIMYR retains biological ﬁdelity in a pathological setting using an Alzheimer’s
+disease MERFISH dataset [ 19], which includes wild-type, Trem2 R47H, 5xFAD, and Trem2 R47H;5xFAD
+brain sections. We ﬁne-tuned the model on three slices from each non-wild-type genotype, reserving
+two slices for validation and testing. The baseline method uses the validation slice for lookup-based
+prediction. Across genotypes, M IMYR consistently outperformed the baseline, producing spatial and
+transcriptional reconstructions that more faithfully capture the underlying pathological organization.
+Because the gene-expression module can generate spatial transcriptomes conditioned on metadata
+tokens, we examined two relevant scenarios for downstream analysis. In the ﬁrst, we held out 20 of the
+300 genes during ﬁne-tuning and prompted the model to output the full transcriptome (2,000 pretrain-
+ing genes) using scRNA-seq technology tokens. M IMYR successfully generated expression for 1,811
+of the 2,000 genes and accurately predicted expression for both in-panel genes and the held-out genes
+(Fig. 4A). Predicted spatial expression closely matched ground truth ( Fig. 4B) for these held-out genes.
+Notably, several Alzheimer’s-associated genes absent from the MERFISH panel – including Tyrobp (mi-
+croglia) [ 21] and Cux2 (Layer 2/3 glutamatergic neurons) [ 22] – displayed spatial patterns consistent
+with known cell-type distributions ( Fig. 4C), demonstrating the model’s capacity to extend transcrip-
+tomic coverage in biologically meaningful ways.
+In the second scenario, we used metadata conditioning to generate expression for the same test slice
+under both Alzheimer’s and wild-type conditions and analyzed the resulting differential expression pat-
+terns. Importantly, the model was not ﬁne-tuned on any wild-type slices from this dataset. Nevertheless,
+we observed subtle but consistent shifts in expression proﬁles between cells of the same type when
+conditioned on different disease states ( Fig. 4D). The largest shifts occurred in oligodendrocyte-lineage
+cells (OPC-Oligo), immune cells (including microglia), and astrocyte-ependymal cells (Astro-Epen). To
+7
+
+=== PDF PAGE 8 ===
+Tyrobp
+ Cux2
+A B C
+D E
+0.03 0.05 0.1
+Radius
+0.0
+0.2
+0.4
+0.6Soft Spearman
+training genes
+held-out genes
+-log10(adjusted p) (GT)
+0 2 4
+0
+100
+200
+300
+OPC-Oligo
+0 2 4 6
+logFC (GT)
+0
+100
+200
+300
+Immune
+GT and PredGT only Pred only none
+IT-ET Glut
+NP-CT-L6b Glut
+OB-CR Glut
+DG-IMN Glut
+OB-IMN GABA
+CTX-CGE GABA
+CTX-MGE GABA
+CNU-MGE GABA
+CNU-LGE GABA
+CNU-HYa GABA
+HY GABA
+CNU-HYa Glut
+HY Glut
+HY MM Glut
+MH-LH Glut
+TH Glut
+MB Glut
+MB GABA
+MB Dopa
+MY Glut
+Pineal Glut
+Astro-Epen
+OPC-Oligo
+OEC
+Vascular
+Immune
+Generated WT
+Generated AD
+Cell type
+Disease state used for generation
+Nptx1 (GT) Nptx1 (Pred)
+00 . 2 0 . 4 0 . 6 0 . 8 1 . 0 00 . 2 0 . 4 0 . 6 0 . 8 1 . 0
+UMAP
+UMAP
+Figure 4: Applying M IMYR to an Alzheimer’s disease dataset. A. Soft Spearman correlation at radii r →
+{0.03, 0.05, 0.10} for the ﬁnetuned M IMYR model evaluated on 280 training genes and 20 held-out genes not
+seen during training. Here, M IMYR predicts expression for all 2,000 genes in its vocabulary . B. Spatial plots
+comparing ground-truth and M IMYR -predicted expression of a held-out gene, Nptx1. C. Spatial plots showing
+MIMYR -predicted expression of Alzheimer’s marker genes that were not measured in the original dataset. D.
+UMAP visualization of M IMYR -generated gene expression conditioned on wild-type or disease state, colored
+by cell type (top) and disease state (bottom). E. Volcano plots for oligodendrocytes (top) and immune cells
+(bottom) showing differentially expressed genes between disease states in ground-truth and generated data,
+colored by whether they are differential in ground truth, generated, both, or neither.
+quantify correspondence with true disease biology, we computed differentially expressed genes (DEGs)
+between wild-type and Alzheimer’s states in the generated data and compared them to DEGs from the
+real dataset (wild-type versus Trem2 R47H;5xFAD). For these three major cell types, all DEGs identi-
+ﬁed in the generated data were contained within the ground-truth DEGs ( Fig. 4E), although a subset of
+experimentally observed DEGs were not recovered by the model.
+Overall, these results demonstrate that M IMYR can robustly extend the transcriptome to nearly all
+genes available from pretraining and can generate synthetic wild-type controls for disease datasets while
+still recapitulating biologically meaningful gene-expression shifts across conditions. These capabilities
+support downstream analyses even with limited samples, sparse panels, or missing spatial regions.
+8
+
+=== PDF PAGE 9 ===
+Discussion
+In this work we introduced M IMYR , a uniﬁed framework for regenerating missing or damaged regions
+in spatial transcriptomics tissues. The method decomposes tissue reconstruction into three sequential
+stages: (1) generating plausible cell locations given a speciﬁed hole, optionally guided by neighboring
+slices; (2) predicting cell identity conditioned solely on spatial position; and (3) producing realistic gene-
+expression proﬁles for each generated cell using the predicted locations and cell types.
+Across multiple analyses, we showed that MIMYR yields coherent and biologically plausible comple-
+tions. The reconstructed tissues exhibit spatially consistent cell-type distributions and gene-expression
+patterns that align well with ground truth. We also demonstrated robustness in data-sparse settings and
+showed that with minimal ﬁne-tuning, M IMYR transfers effectively across samples, gene panels, and
+slice orientations (e.g., sagittal). These results indicate that the model does not rely on dataset-speciﬁc
+heuristics, but rather captures transferable spatial and transcriptional structure that generalizes across
+gene panels and technologies.
+Beyond reconstruction, M IMYR provides practical utility for biological inference. We showed that
+the model can augment limited gene panels by predicting spatial patterns of unmeasured genes in dis-
+eased tissues. By manipulating disease-state metadata during generation, the framework can also sim-
+ulate corresponding healthy or control tissues, enabling counterfactual analyses that are otherwise in-
+accessible. This ability to generate inferred “what-if” states opens opportunities for exploring disease-
+associated perturbations, estimating unmeasured gene programs, and supporting downstream workﬂows
+such as DEG analysis or spatial neighborhood characterization.
+MIMYR also suggests several promising directions for future work. Its generative nature naturally
+extends to interpolating in-between slices, enabling denser 3D reconstructions and providing powerful
+data augmentation for spatial analysis methods. While our experiments focused on the mouse brain due
+to the availability of high-quality datasets, the approach is general and can be applied to other organs and
+species. One current limitation is the reliance on aligned slices, achieved through the Allen CCF. Exist-
+ing CCF-based registration requires manual steps and can be time-consuming; developing alignment-free
+methods or more automated registration pipelines would further broaden applicability. Another oppor-
+tunity lies in integrating additional spatial modalities such as histology, protein imaging, or chromatin
+accessibility, which could further strengthen conditioning signals for reconstruction.
+Overall, M IMYR ﬁlls a gap in an under-explored problem space and establishes a ﬂexible foundation
+for future generative models in spatial biology. It enables new biological analyses, supports inference in
+low-data regimes, and expands the computational toolkit available for spatial transcriptomics research.
+9
+
+=== PDF PAGE 10 ===
+Methods
+MIMYR overview
+Reconstructing a missing tissue region requires reasoning about where cells should be located, what
+identities they should take on, and how their gene-expression programs should manifest within their
+spatial context. To make this problem tractable, we decompose it into three sequential generative stages
+that reﬂect this hierarchy ( Fig. 1). First, we infer a plausible spatial layout of cells in the unobserved
+slice using a diffusion model that learns the global anatomical density and adapts it to arbitrary slicing
+planes. Second, given these reconstructed coordinates, we assign cell-type identities using a lightweight
+classiﬁer that captures how cell types are spatially organized across the tissue and transfers this structure
+to unlabeled regions. Finally, conditioned on both spatial position and predicted identity, as well as
+additional sample-level attributes, we generate full gene-expression proﬁles using a transformer-based
+model that captures local transcriptional neighborhoods and broader regulatory structure. Together, these
+components form an integrated framework that reconstructs realistic and spatially coherent cellular and
+molecular landscapes in missing tissue sections.
+Predicting cell locations with guided diffusion
+To infer plausible cell coordinates within unobserved regions of a tissue, we use a diffusion-based gen-
+erative model that learns the underlying spatial density of cells while conditioning on an explicit repre-
+sentation of the slicing plane. Trained on reference slices from full organ samples, the model captures
+a continuous probability distribution across the three-dimensional anatomical space (x, y, z) and learns
+how spatial density varies across arbitrary section orientations.
+Formally, we model the conditional density p(x | c) over spatial coordinates x → R3 given a plane
+descriptor c → R6, where c =( px,p y,p z ,n x,n y,n z ) encodes a point on the plane and its unit normal.
+The model is implemented as a denoising diffusion probabilistic model (DDPM) [ 23]. During training,
+Gaussian noise is progressively added to the true cell coordinates according to the forward process:
+q(xt | xt→1)= N (
+√
+1 ↑ ωt xt→1,ω tI), (1)
+and a neural network learns the conditional reverse process by predicting the injected noise at each
+timestep, given both the noisy coordinates xt and the plane condition c. At inference time, generating
+the spatial layout of a slice reduces to sampling from the reverse diffusion process while supplying the
+desired plane descriptor c. This conditioning mechanism allows the model to generalize to arbitrary
+intermediate slice positions and orientations, and it naturally supports variable slice thickness by scaling
+the number of sampled points to match the expected density for the speciﬁed plane.
+When neighboring slices are available, we optionally reﬁne the generated coordinates using informa-
+tion from the closest observed section. Instead of relying solely on the unconditional plane-conditioned
+density, we incorporate backward universal guidance [ 24] to bias samples toward structures that are
+known to appear adjacent to the target slice.
+˜ε(zt,t )= εω(zt,t )+ ϑ
+√
+ϖ t/(1 ↑ ϖ t) ↓ ˆz0 log pKDE(ˆz0) (2)
+Speciﬁcally, we compute a KDE on the nearest real slice and use its gradient as a weak anatomical prior
+during sampling. At each reverse diffusion step, the samples are nudged toward regions of higher KDE
+10
+
+=== PDF PAGE 11 ===
+density. We choose backward guidance here due to its computational simplicity and stronger adherence
+to the energy function. This preserves the model’s global distribution while using neighboring sections
+to enforce local anatomical consistency when available.
+Predicting cell identity with a multi-layer perceptron
+We infer cluster identities using a lightweight MLP [ 25] trained to map each cell’s spatial coordinates
+to its cell-type label, using annotated slices for supervision and applying the model to predict labels in
+unannotated regions.
+Formally, let the labeled dataset be:
+DL = {(xi,y i)}NL
+i=1, (3)
+where xi → R3 denotes the spatial coordinates and yi →{ 1,...,C } denotes the corresponding cell-type
+label. We learn a function:
+fω(x)=( p1,...,p C ),p i ↔ 0,
+C∑
+i=1
+pi =1 , (4)
+parameterized by ϱ, to approximate the posterior p( y | x).
+The MLP consists of multiple fully connected layers with ReLU activations and a softmax output
+layer. We optimize the categorical cross-entropy loss using the Adam optimizer [ 26]:
+L = ↑
+∑
+i
+log fω(yi | xi). (5)
+When sufﬁcient labeled data are available, the MLP is trained directly on DL. When labeled data are
+limited, we ﬁrst pretrain the model on a fully annotated reference sample to learn global correspondences
+between spatial coordinates and cell-type structure. We then ﬁnetune the weights on the available labeled
+slices from the target sample, enabling the model to adapt to local spatial variations while retaining global
+structural priors. This transfer learning setup is applicable to the gene-expression prediction module as
+well.
+After training, the model estimates cell-type probabilities for unlabeled slices:
+pω(c | xj )= fω(xj ), xj → DU . (6)
+Instead of taking the most likely class, we sample cell-type assignments from this predictive distribution:
+ˆyj ↗ pω(c | xj ), (7)
+which yields more diverse and locally consistent cell-type assignments.
+Using location and cell identity to predict gene expression
+After inferring each cell’s spatial position and identity, we generate its full gene-expression proﬁle. Let
+xi denote the expression proﬁle of cell i with type ci and spatial location si. The baseline problem is to
+11
+
+=== PDF PAGE 12 ===
+learn a conditional generator of the form:
+xi ↗ pω(xi | ci,s i), (8)
+where ϱ represents the learnable parameters of the model. We extend this formulation to incorporate
+additional sample-level attributes such as species, disease state, gene panel, technology, and organ as
+conditioning variables.
+To learn ϱ, we employ a transformer-based architecture trained in a next-token prediction framework
+(a variant of this was ﬁrst introduced in scMulan [ 27]). Each gene token or metadata token is represented
+by two components: an identity embedding and an expression (or value) embedding, which are encoded
+separately and summed to form the input token representation. We only predict expression for genes
+that are expressed in the given cell; unexpressed genes are omitted from the input sequence. Because
+different cells express varying numbers of genes, we add padding tokens to reach a ﬁxed context length
+or truncate sequences that exceed it.
+Spatial locations are represented as discrete tokens by binning the x, y, and z coordinates into 100
+bins each, with random integer noise uniformly sampled from {↑2, ↑1, 0, 1, 2} added to each coordinate
+during training to improve spatial robustness. Gene expression levels are similarly discretized into 100
+bins for the binned expression prediction head.
+The transformer outputs are passed through three decoder heads: (1) a gene identity head for re-
+constructing gene tokens, (2) a binned expression head for predicting discretized expression levels, and
+(3) a real-valued expression head for regressing continuous expression values. The gene identity and
+binned expression heads receive the direct output of the transformer, while the real-valued expression
+head operates on the output of the binned expression prediction.
+During training, we minimize a weighted combination of losses: cross-entropy for gene identity and
+binned expression, and mean squared error for real-valued expression. The relative weighting between
+the gene identity and expression terms is controlled by a scaling factor ϖ (default ϖ =1 ), while the
+binned and real-valued expression losses are equally balanced.
+At generation time, predicted gene identity and binned expression levels are recursively fed back
+into the model to generate subsequent tokens, enabling autoregressive synthesis of complete expression
+proﬁles. Generation continues until an end-of-sequence token is reached or a predeﬁned number of non-
+descending tokens is produced to detect stagnation, after which end-of-sequence pruning halts further
+generation. We tested both a small 0.25M-parameter model and a medium 23M-parameter model and
+use the medium model for all evaluations.
+Because next-token prediction requires ordering gene tokens into a sequence, genes that appear later
+in the sequence are predicted conditional on those that appear earlier. Genes, however, have no inherent
+ordering, and an arbitrary ordering could introduce bias. To impose a biologically grounded ordering, we
+construct a directed gene regulatory network (GRN) restricted to the model’s gene vocabulary (by pro-
+cessing a mouse brain A TAC-seq atlas [28] using Signac [29]) and apply a condensation and tie-breaking
+procedure to linearize the graph. The goal is to produce a total order that respects the GRN, ensuring
+that for every directed edge (g1,g 2), the source precedes its target ( g1 <g 2). Strongly connected com-
+ponents, corresponding to cyclic regulatory motifs, are internally ordered by minimally breaking edges
+and prioritizing nodes with higher out-degree, producing a reproducible, topology-consistent sequence
+suitable for autoregressive modeling.
+12
+
+=== PDF PAGE 13 ===
+Datasets used in this work
+We evaluated M IMYR across multiple large-scale spatial transcriptomic datasets spanning healthy and
+diseased mouse brains. Our primary dataset is a whole-brain MERSCOPE atlas comprising approxi-
+mately ten million cells and proﬁling more than 500 genes [ 18]. These data are integrated with scRNA-
+seq to deﬁne over 5,000 molecularly distinct clusters, all registered to the Allen Mouse Brain Common
+Coordinate Framework (CCF) [ 30]. Four randomly selected slices were held out for validation and ﬁve
+for testing, with all remaining sections used for training. This dataset provides a foundation for assessing
+reconstruction performance in a regime with abundant training data.
+To assess generalization across samples, gene panels, and spatial orientations, we additionally used
+a companion MERFISH dataset [ 9] that offers comparable whole-brain coverage aligned to the same
+CCF but measured over a distinct panel of more than 1,100 genes. For the panel-shift and cross sample
+experiments – where the target dataset contains a non-overlapping gene panel – we ﬁne-tuned the pre-
+trained model on four slices, used one slice for validation, and evaluated on ﬁve held-out slices. We also
+report a zero-shot version of this experiment without ﬁnetuning. To evaluate robustness to orientation,
+we introduced a sagittal setting: models were ﬁne-tuned on sagittal slices and evaluated on independent
+sagittal test slices using a 4/1/5 split for ﬁne-tuning, validation, and testing.
+To examine M IMYR ’s ability to generalize to a disease context, we used an Alzheimer’s disease
+MERFISH dataset [19], which includes 19 brain sections spanning four genotypes: wild-type, Trem2R47H,
+5xFAD, and Trem2R47H;5xFAD. Because CCF registration was not available for this dataset, we applied
+a preprocessing step to align all slices to the Allen CCF, adapting the registration workﬂow from [ 18] for
+consistent coordinate mapping. We also mapped the cell type labels to the single-cell reference dataset
+via label transfer in a shared latent space. Speciﬁcally, following the integration protocol of our primary
+dataset [18], we co-embedded the cells into a 100-dimensional latent space based on the normalized and
+log1p-transformed counts of the shared genes, and hierarchically assigned cell type labels by nearest
+neighbor voting with a conﬁdence threshold.
+Baseline methods
+We compared MIMYR against a rule-based baseline designed to mirror its three-stage prediction process
+– location, cell type, and gene expression – while relying solely on spatial proximity and local voting.
+All baseline predictions are drawn from a reference set composed of the available training or ﬁne-tuning
+slices. For location prediction, the baseline assigns cell coordinates from the spatially nearest slice in the
+reference set; when no ﬁne-tuning data are available (zero-shot transfer), locations are instead sampled
+uniformly along a circle centered on the target region. Given these locations, cell types are assigned by
+majority voting among the 20 nearest neighbors in the reference slice. Gene expression proﬁles are then
+copied from the closest reference cell that shares the same predicted cell type. This sequential, rule-based
+procedure provides a consistent and interpretable baseline across all evaluation settings.
+Evaluation metrics
+We evaluate reconstruction quality using two neighborhood-aware metrics: soft Spearman correlation
+and soft F1, which jointly measure local spatial and transcriptional coherence between the generated and
+ground-truth tissues.
+13
+
+=== PDF PAGE 14 ===
+Soft Spearman Correlation. For each ground-truth cell located at position xi, we deﬁne a local neigh-
+borhood (or “spot”) as all cells within a ﬁxed spatial radius r:
+Ngt(i)= { j |↘xgt
+j ↑ xi↘2 ≃ r }, Npred(i)= { j |↘xpred
+j ↑ xi↘2 ≃ r }. (9)
+Within each spot, we aggregate the gene expression vectors over all neighboring cells:
+gi =
+∑
+j↑Ngt(i)
+Xgt
+j , pi =
+∑
+j↑Npred(i)
+Xpred
+j , (10)
+where Xgt
+j and Xpred
+j denote the gene expression vectors of cell j in the ground-truth and predicted tissues,
+respectively. We then compute the Spearman correlation ςi =c o r rS (gi, pi) between the aggregated
+expression proﬁles of the two corresponding spots. The ﬁnal score is the mean correlation across all
+ground-truth cells:
+SoftSpearman = 1
+N
+N∑
+i=1
+ςi. (11)
+This measures how well local spatial expression gradients are preserved in the generated tissue.
+Soft F1 Score. To quantify local agreement in gene activation, we compute a radius-based soft F1 score
+using the same neighborhood deﬁnition. For each cell i, after summing expressions within the cor-
+responding spots to obtain gi and pi, we binarize each gene as active if its aggregated expression is
+nonzero:
+gbin
+i = 1[gi > 0], pbin
+i = 1[pi > 0]. (12)
+We then compute local precision and recall as
+Precisioni = |pbin
+i ⇐ gbin
+i |
+|pbin
+i | , Recalli = |pbin
+i ⇐ gbin
+i |
+|gbin
+i | , (13)
+and their harmonic mean
+F1i = 2 Precisioni ⇒ Recalli
+Precisioni + Recalli
+. (14)
+The global score is averaged across all ground-truth spots:
+SoftF1 = 1
+N
+N∑
+i=1
+F1i. (15)
+This metric evaluates whether predicted expression hotspots overlap with true active regions within each
+radius-deﬁned neighborhood, providing a spatially tolerant measure of local transcriptional agreement.
+14
+
+=== PDF PAGE 15 ===
+Data Availability
+All datasets used in this study are publicly available. The primary MERSCOPE whole-brain atlas and
+companion MERFISH dataset are available through the published resources of Y ao et al. [18] and Zhang
+et al. [9], respectively, including aligned coordinates and cell-type annotations. The Alzheimer’s disease
+MERFISH dataset from Johnston et al. [ 19] is similarly accessible through its associated publication.
+Code Availability
+The source code for M IMYR is available on GitHub: https://github.com/gkrieg/mimyr.
+Acknowledgment
+This work was supported, in part, by National Institutes of Health Common Fund 4D Nucleome Pro-
+gram grant UM1HG011593 (J.M.); National Institutes of Health Common Fund Cellular Senescence
+Network Program grant UH3CA268202 (J.M.); and National Institutes of Health grants R01HG007352
+(J.M.), R01HG012303 (J.M.), R21DA061481 (J.M.), and R03OD039980 (J.M.). J.M. was additionally
+supported by the Ray and Stephanie Lane Professorship, a Guggenheim Fellowship from the John Si-
+mon Guggenheim Memorial Foundation, and a Google Research Award. S.K. is a Lane Fellow. The
+funders had no role in study design, data collection and analysis, decision to publish or preparation of
+the manuscript.
+Author Contributions
+Conceptualization, A.D., Z.B., J.M., S.K.; Methodology, A.D., Z.B., J.M., S.K.; Software, A.D., Z.B.,
+S.K.; Investigation, A.D., Z.B., J.M., S.K.; Writing, A.D., Z.B., J.M., S.K.; Funding Acquisition, J.M.
+Competing Interests
+The authors declare no competing interests.
+15
+
+=== PDF PAGE 16 ===
+References
+[1] Bressan, D., Battistoni, G. & Hannon, G. J. The dawn of spatial omics. Science 381 (2023).
+[2] Moses, L. & Pachter, L. Museum of spatial transcriptomics. Nature Methods 19, 534–546 (2022).
+[3] Liu, L. et al. Spatiotemporal omics for biology and medicine. Cell 187, 4488–4519 (2024).
+[4] Maynard, K. R. et al. Transcriptome-scale spatial gene expression in the human dorsolateral pre-
+frontal cortex. Nature Neuroscience 24, 425–436 (2021).
+[5] Rao, A., Barkley, D., França, G. S. & Y anai, I. Exploring tissue architecture using spatial transcrip-
+tomics. Nature 596, 211–220 (2021).
+[6] Chidester, B., Zhou, T., Alam, S. & Ma, J. SPICEMIX enables integrative single-cell spatial
+modeling of cell identity. Nature Genetics 55, 78–88 (2023).
+[7] Krieger, S., Haber, E. & Ma, J. EYKTHYR reveals transcriptional regulators of spatial gene pro-
+grams. bioRxiv 2025–05 (2025).
+[8] Kummerfeld, E. et al. Artifacts in spatial transcriptomics data: their detection, importance, preva-
+lence, and prevention. Brieﬁngs in Bioinformatics 26, bbaf306 (2025).
+[9] Zhang, M. et al. Molecularly deﬁned and spatially resolved cell atlas of the whole mouse brain.
+Nature 624, 343–354 (2023).
+[10] Liu, X., Zeira, R. & Raphael, B. J. Partial alignment of multislice spatially resolved transcriptomics
+data. Genome Research 33, 1124–1132 (2023).
+[11] Baker, E. A., Schapiro, D., Dumitrascu, B., Vickovic, S. & Regev, A. In silico tissue generation
+and power analysis for spatial omics. Nature Methods 20, 424–431 (2023).
+[12] Y u, T.et al. Tissue reassembly with generative AI. bioRxiv 2025–02 (2025).
+[13] Li, K., Li, J., Tao, Y . & Wang, F. stDiff: a diffusion model for imputing spatial transcriptomics
+through single-cell transcriptomics. Brieﬁngs in Bioinformatics 25 (2024).
+[14] Song, T., Broadbent, C. & Kuang, R. GNTD: reconstructing spatial transcriptomes with graph-
+guided neural tensor decomposition informed by spatial and functional relations. Nature Commu-
+nications 14, 8276 (2023).
+[15] Que, N., Wang, X., Chen, J., Jiang, Y . & Li, C. Adaptive spatial transcriptomics interpolation via
+cross-modal cross-slice modeling. In International Conference on Medical Image Computing and
+Computer-Assisted Intervention, 45–54 (Springer, 2025).
+[16] Lin, S. et al. Bridging the dimensional gap from planar spatial transcriptomics to 3D cell atlases.
+bioRxiv 2024–12 (2024).
+[17] Khan, S. A. et al. stDiffusion: A diffusion based model for generative spatial transcriptomics. In
+ICLR 2025 Workshop on Machine Learning for Genomics Explorations (2025).
+[18] Y ao, Z. et al. A high-resolution transcriptomic and spatial atlas of cell types in the whole mouse
+brain. Nature 624, 317–332 (2023).
+[19] Johnston, K. G. et al. Single-cell spatial transcriptomics reveals distinct patterns of dysregulation
+in non-neuronal and neuronal cells induced by the Trem2 R47H Alzheimer’s risk gene mutation.
+Molecular Psychiatry 30, 461–477 (2025).
+[20] Haber, E., Deshpande, A., Ma, J. & Krieger, S. Uniﬁed integration of spatial transcriptomics across
+platforms with LLOKI. Genome Research (2025).
+[21] Haure-Mirande, J.-V ., Audrain, M., Ehrlich, M. E. & Gandy, S. Microglial TYROBP/DAP12 in
+Alzheimer’s disease: Transduction of physiological and pathological signals across trem2. Molec-
+ular Neurodegeneration 17, 55 (2022).
+16
+
+=== PDF PAGE 17 ===
+[22] Otero-Garcia, M. et al. Molecular signatures underlying neuroﬁbrillary tangle susceptibility in
+Alzheimer’s disease. Neuron 110, 2929–2948 (2022).
+[23] Ho, J., Jain, A. & Abbeel, P . Denoising diffusion probabilistic models. Advances in Neural Infor-
+mation Processing Systems 33, 6840–6851 (2020).
+[24] Bansal, A. et al. Universal guidance for diffusion models. In Proceedings of the IEEE/CVF Con-
+ference on Computer Vision and Pattern Recognition, 843–852 (2023).
+[25] Rumelhart, D. E., Hinton, G. E. & Williams, R. J. Learning representations by back-propagating
+errors. Nature 323, 533–536 (1986).
+[26] Kingma, D. P . & Ba, J. Adam: A method for stochastic optimization. arXiv (2014).
+[27] Bian, H. et al. scMulan: a multitask generative pre-trained language model for single-cell analysis.
+In International Conference on Research in Computational Molecular Biology, 479–482 (Springer,
+2024).
+[28] Cusanovich, D. A. et al. A single-cell atlas of in vivo mammalian chromatin accessibility. Cell
+174, 1309–1324 (2018).
+[29] Stuart, T., Srivastava, A., Madad, S., Lareau, C. A. & Satija, R. Single-cell chromatin state analysis
+with Signac. Nature Methods 18, 1333–1341 (2021).
+[30] Wang, Q. et al. The Allen mouse brain common coordinate framework: a 3D reference atlas. Cell
+181, 936–953 (2020).
+17
